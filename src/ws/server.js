@@ -1,9 +1,9 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { wsArcjet } from '../arcjet.js';
 
-const sendJson = (ws, payload) => {
+const sendJson = (socket, payload) => {
   if (ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify(payload));
+  socket.send(JSON.stringify(payload));
 };
 
 const broadcast = (wss, payload) => {
@@ -20,32 +20,47 @@ export const createWss = (httpServer) => {
     maxPayload: 1024 * 1024,
   });
 
-  wss.on('connection', async (ws, req) => {
+  httpServer.on('upgrade', async (req, socket, head) => {
+    const { pathname } = new URL(req.url, `http://${req.headers.host}`);
+
+    if (pathname !== '/ws') {
+      return;
+    }
+
     if (wsArcjet) {
       try {
-        const decision = wsArcjet.protect(req);
+        const decision = await wsArcjet.protect(req);
+
         if (decision.isDenied()) {
-          const code = decision.reason.isRateLimit() ? 1013 : 1008;
-          const reason = decision.reason.isRateLimit()
-            ? 'Too Many Requests'
-            : 'Access Denied';
-          ws.close(code, reason);
+          if (decision.reason.isRateLimit()) {
+            socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+          } else {
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+          }
+          socket.destroy();
           return;
         }
-      } catch (error) {
-        console.error('Arcjet middleware error', error);
-        ws.close(1011, 'Internal Server Error');
+      } catch (e) {
+        console.error('WS upgrade protection error', e);
+        socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+        socket.destroy();
         return;
       }
     }
 
-    ws.isAlive = true;
-
-    ws.on('pong', () => {
-      ws.isAlive = true;
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
     });
-    sendJson(ws, { type: 'welcome' });
-    ws.on('error', console.error);
+  });
+
+  wss.on('connection', async (socket, req) => {
+    socket.isAlive = true;
+
+    socket.on('pong', () => {
+      socket.isAlive = true;
+    });
+    sendJson(socket, { type: 'welcome' });
+    socket.on('error', console.error);
   });
 
   const interval = setInterval(() => {
