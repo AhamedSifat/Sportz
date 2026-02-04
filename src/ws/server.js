@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import { wsArcjet } from '../arcjet.js';
 
 const sendJson = (ws, payload) => {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -19,7 +20,25 @@ export const createWss = (httpServer) => {
     maxPayload: 1024 * 1024,
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', async (ws, req) => {
+    if (wsArcjet) {
+      try {
+        const decision = wsArcjet.protect(req);
+        if (decision.isDenied()) {
+          const code = decision.reason.isRateLimit() ? 1013 : 1008;
+          const reason = decision.reason.isRateLimit()
+            ? 'Too Many Requests'
+            : 'Access Denied';
+          ws.close(code, reason);
+          return;
+        }
+      } catch (error) {
+        console.error('Arcjet middleware error', error);
+        ws.close(1011, 'Internal Server Error');
+        return;
+      }
+    }
+
     ws.isAlive = true;
 
     ws.on('pong', () => {

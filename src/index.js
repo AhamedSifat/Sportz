@@ -1,6 +1,7 @@
 import express from 'express';
 import { matchesRouter } from './routes/matches.js';
 import { createWss } from './ws/server.js';
+import { securityMiddleware } from './arcjet.js';
 import http from 'http';
 
 const PORT = Number(process.env.PORT) || 8000;
@@ -15,6 +16,9 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Sportz API!' });
 });
+
+// Security middleware
+app.use(securityMiddleware());
 
 // Matches routes
 app.use('/matches', matchesRouter);
