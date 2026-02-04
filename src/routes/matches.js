@@ -53,6 +53,10 @@ matchesRouter.post('/', async (req, res) => {
         awayScore: parsed.data.awayScore ?? 0,
       })
       .returning();
+
+    if (req.app.locals.broadcastMatchCreated) {
+      req.app.locals.broadcastMatchCreated(event);
+    }
     return res.status(201).json({ data: event });
   } catch (error) {
     console.error('Error creating match:', error);
