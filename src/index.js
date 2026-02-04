@@ -26,8 +26,9 @@ app.use(securityMiddleware());
 app.use('/matches', matchesRouter);
 app.use('/matches', commentaryRouter);
 
-const { broadcastMatchCreated } = createWss(server);
+const { broadcastMatchCreated, broadcastCommentary } = createWss(server);
 app.locals.broadcastMatchCreated = broadcastMatchCreated;
+app.locals.broadcastCommentary = broadcastCommentary;
 
 // Start server
 server.listen(PORT, HOST, () => {

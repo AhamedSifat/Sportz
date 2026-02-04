@@ -85,6 +85,10 @@ commentaryRouter.post('/:matchId/commentary', async (req, res) => {
       })
       .returning();
 
+    if (res.locals.broadcastCommentary) {
+      res.locals.broadcastCommentary(newCommentary.matchId, newCommentary);
+    }
+
     return res.status(201).json({ data: newCommentary });
   } catch (error) {
     console.error('Error creating commentary:', error);
